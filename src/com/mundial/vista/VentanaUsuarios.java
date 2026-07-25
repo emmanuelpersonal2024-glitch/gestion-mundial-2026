@@ -1,0 +1,290 @@
+package com.mundial.vista;
+
+import com.mundial.dao.UsuarioDAO;
+import com.mundial.modelo.Usuario;
+import com.mundial.vista.componentes.ModalUsuario;
+import com.mundial.vista.componentes.TableActionCellEditor;
+import com.mundial.vista.componentes.TableActionCellRender;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
+import java.awt.*;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.util.List;
+
+public class VentanaUsuarios extends JPanel {
+
+    private JTable tablaUsuarios;
+    private DefaultTableModel modeloTabla;
+    private TableRowSorter<DefaultTableModel> sorter;
+    private UsuarioDAO dao;
+    
+    private static final Color COLOR_FONDO  = new Color(10, 14, 26);
+    private static final Color COLOR_PANEL  = new Color(20, 26, 46);
+    private static final Color COLOR_ACENTO = new Color(212, 175, 55);
+
+    public VentanaUsuarios() {
+        dao = new UsuarioDAO();
+        setLayout(new BorderLayout(0, 20));
+        setBackground(COLOR_FONDO);
+        setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+
+        add(crearHeader(), BorderLayout.NORTH);
+        
+        JPanel panelCentro = new JPanel(new BorderLayout(0, 10));
+        panelCentro.setOpaque(false);
+        panelCentro.add(crearBarraBusqueda(), BorderLayout.NORTH);
+        panelCentro.add(crearTabla(), BorderLayout.CENTER);
+        
+        add(panelCentro, BorderLayout.CENTER);
+
+        cargarDatosTabla();
+        
+        this.addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentShown(java.awt.event.ComponentEvent e) {
+                cargarDatosTabla();
+            }
+        });
+    }
+    
+    private JPanel crearHeader() {
+        JPanel header = new JPanel(new BorderLayout());
+        header.setOpaque(false);
+        
+        JPanel panelTextos = new JPanel(new GridLayout(2, 1));
+        panelTextos.setOpaque(false);
+        
+        JLabel lblTitulo = new JLabel("Gestión de Usuarios");
+        lblTitulo.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        lblTitulo.setForeground(Color.WHITE);
+        
+        JLabel lblSub = new JLabel("Administra cuentas, roles y credenciales del sistema.");
+        lblSub.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblSub.setForeground(new Color(180, 190, 210));
+        
+        panelTextos.add(lblTitulo);
+        panelTextos.add(lblSub);
+        
+        JButton btnAgregar = new JButton(" Añadir Usuario ");
+        java.net.URL iconUrl = getClass().getResource("/com/mundial/recursos/iconos/agregar.png");
+        if (iconUrl != null) {
+            ImageIcon icon = new ImageIcon(iconUrl);
+            Image img = icon.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH);
+            btnAgregar.setIcon(new ImageIcon(img));
+        }
+        btnAgregar.setBackground(new Color(40, 167, 69)); // Verde
+        btnAgregar.setForeground(Color.WHITE);
+        btnAgregar.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        btnAgregar.setFocusPainted(false);
+        btnAgregar.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        btnAgregar.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnAgregar.addActionListener(e -> mostrarModalAgregar());
+        
+        JPanel panelBtn = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        panelBtn.setOpaque(false);
+        panelBtn.add(btnAgregar);
+        
+        header.add(panelTextos, BorderLayout.CENTER);
+        header.add(panelBtn, BorderLayout.EAST);
+        
+        return header;
+    }
+    
+    private JPanel crearBarraBusqueda() {
+        JPanel panelBusqueda = new JPanel(new BorderLayout(15, 0));
+        panelBusqueda.setBackground(COLOR_PANEL);
+        panelBusqueda.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        
+        JTextField txtBuscar = new JTextField("Buscar por Nombre o Rol...");
+        txtBuscar.setBackground(COLOR_FONDO);
+        txtBuscar.setForeground(Color.GRAY);
+        txtBuscar.setCaretColor(COLOR_ACENTO);
+        txtBuscar.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        txtBuscar.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        
+        txtBuscar.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusGained(java.awt.event.FocusEvent e) {
+                if (txtBuscar.getText().equals("Buscar por Nombre o Rol...")) {
+                    txtBuscar.setText("");
+                    txtBuscar.setForeground(Color.WHITE);
+                }
+            }
+            public void focusLost(java.awt.event.FocusEvent e) {
+                if (txtBuscar.getText().trim().isEmpty()) {
+                    txtBuscar.setForeground(Color.GRAY);
+                    txtBuscar.setText("Buscar por Nombre o Rol...");
+                }
+            }
+        });
+        
+        JButton btnLimpiar = new JButton("Limpiar Filtros");
+        btnLimpiar.setBackground(new Color(60, 70, 90));
+        btnLimpiar.setForeground(Color.WHITE);
+        btnLimpiar.setFocusPainted(false);
+        btnLimpiar.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        btnLimpiar.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        
+        txtBuscar.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e) {
+                String text = txtBuscar.getText();
+                if (text.equals("Buscar por Nombre o Rol...")) return;
+                
+                if (text.trim().length() == 0) {
+                    sorter.setRowFilter(null);
+                } else {
+                    sorter.setRowFilter(RowFilter.regexFilter("(?i)" + text));
+                }
+            }
+        });
+        
+        btnLimpiar.addActionListener(e -> {
+            txtBuscar.setForeground(Color.GRAY);
+            txtBuscar.setText("Buscar por Nombre o Rol...");
+            sorter.setRowFilter(null);
+            tablaUsuarios.requestFocus(); 
+        });
+        
+        panelBusqueda.add(txtBuscar, BorderLayout.CENTER);
+        panelBusqueda.add(btnLimpiar, BorderLayout.EAST);
+        
+        return panelBusqueda;
+    }
+    
+    private JScrollPane crearTabla() {
+        modeloTabla = new DefaultTableModel(new Object[]{"ID", "Nombre de Usuario", "Rol del Sistema", "Acciones"}, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column == 3; 
+            }
+        };
+
+        tablaUsuarios = new JTable(modeloTabla);
+        sorter = new TableRowSorter<>(modeloTabla);
+        tablaUsuarios.setRowSorter(sorter);
+        
+        // Estilos premium
+        tablaUsuarios.setRowHeight(40);
+        tablaUsuarios.setBackground(COLOR_PANEL);
+        tablaUsuarios.setForeground(Color.WHITE);
+        tablaUsuarios.setShowVerticalLines(false);
+        tablaUsuarios.setShowHorizontalLines(true);
+        tablaUsuarios.setGridColor(new Color(40, 50, 70));
+        tablaUsuarios.setSelectionBackground(new Color(212, 175, 55, 50));
+        tablaUsuarios.setSelectionForeground(Color.WHITE);
+        tablaUsuarios.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        
+        tablaUsuarios.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
+        tablaUsuarios.getTableHeader().setBackground(new Color(15, 20, 35));
+        tablaUsuarios.getTableHeader().setForeground(COLOR_ACENTO);
+        tablaUsuarios.getTableHeader().setPreferredSize(new Dimension(100, 40));
+        tablaUsuarios.getTableHeader().setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, COLOR_ACENTO));
+        
+        // Configurar botones de accion
+        tablaUsuarios.getColumnModel().getColumn(3).setCellRenderer(new TableActionCellRender());
+        tablaUsuarios.getColumnModel().getColumn(3).setCellEditor(new TableActionCellEditor(new TableActionCellEditor.TableActionListener() {
+            @Override
+            public void onEdit(int row) {
+                mostrarModalEditar(row);
+            }
+
+            @Override
+            public void onDelete(int row) {
+                ejecutarEliminar(row);
+            }
+        }));
+        
+        // Ajustar anchos
+        tablaUsuarios.getColumnModel().getColumn(0).setPreferredWidth(50);
+        tablaUsuarios.getColumnModel().getColumn(0).setMaxWidth(80);
+        tablaUsuarios.getColumnModel().getColumn(3).setPreferredWidth(90);
+        tablaUsuarios.getColumnModel().getColumn(3).setMaxWidth(90);
+
+        JScrollPane scroll = new JScrollPane(tablaUsuarios);
+        scroll.getViewport().setBackground(COLOR_PANEL);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        
+        scroll.getVerticalScrollBar().setUI(new com.mundial.vista.componentes.CustomScrollBarUI());
+        scroll.getHorizontalScrollBar().setUI(new com.mundial.vista.componentes.CustomScrollBarUI());
+        
+        return scroll;
+    }
+    
+    private void cargarDatosTabla() {
+        modeloTabla.setRowCount(0);
+        List<Usuario> lista = dao.listar();
+        for (Usuario u : lista) {
+            modeloTabla.addRow(new Object[]{
+                u.getIdUsuario(), 
+                u.getNombreUsuario(), 
+                u.getRolUsuario(), 
+                ""
+            });
+        }
+    }
+
+    private void mostrarModalAgregar() {
+        Window parent = SwingUtilities.getWindowAncestor(this);
+        ModalUsuario modal = new ModalUsuario(parent, "Añadir Usuario", null);
+        modal.setVisible(true);
+        
+        if (modal.isConfirmado()) {
+            Usuario nuevo = modal.getUsuario();
+            if (dao.insertar(nuevo)) {
+                JOptionPane.showMessageDialog(this, "Usuario creado exitosamente.");
+                cargarDatosTabla();
+            } else {
+                JOptionPane.showMessageDialog(this, "Error. El nombre de usuario podría ya existir.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void mostrarModalEditar(int row) {
+        int id = Integer.parseInt(tablaUsuarios.getValueAt(row, 0).toString());
+        List<Usuario> todos = dao.listar();
+        Usuario actual = null;
+        for (Usuario u : todos) {
+            if (u.getIdUsuario() == id) {
+                actual = u;
+                break;
+            }
+        }
+        
+        if (actual == null) return;
+        
+        Window parent = SwingUtilities.getWindowAncestor(this);
+        ModalUsuario modal = new ModalUsuario(parent, "Modificar Usuario", actual);
+        modal.setVisible(true);
+        
+        if (modal.isConfirmado()) {
+            Usuario editado = modal.getUsuario();
+            if (dao.actualizar(editado)) {
+                JOptionPane.showMessageDialog(this, "Usuario actualizado exitosamente.");
+                cargarDatosTabla();
+            } else {
+                JOptionPane.showMessageDialog(this, "Error al actualizar la base de datos.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void ejecutarEliminar(int row) {
+        int id = Integer.parseInt(tablaUsuarios.getValueAt(row, 0).toString());
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "¿Estás seguro de eliminar el usuario con ID: " + id + "?", 
+            "Confirmar Eliminación", 
+            JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            
+        if (confirm == JOptionPane.YES_OPTION) {
+            String error = dao.eliminar(id);
+            if (error == null) {
+                JOptionPane.showMessageDialog(this, "Usuario eliminado correctamente.");
+                cargarDatosTabla();
+            } else {
+                JOptionPane.showMessageDialog(this, error, "Error de eliminación", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+}
