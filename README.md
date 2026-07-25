@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 <img src="https://img.shields.io/badge/⚽-MUNDIAL%202026-D4AF37?style=for-the-badge&labelColor=0A0E1A&color=D4AF37" alt="Mundial 2026" />
 
